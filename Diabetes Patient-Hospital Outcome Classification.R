@@ -1,0 +1,676 @@
+##-------------------------------
+## FIT GLOBANT
+##-------------------------------
+
+set.seed(2022)
+
+# Metodología - CRISP-DM
+
+# 1. Business understanding
+
+# The data are submitted on behalf of the Center for Clinical and Translational Research, 
+# Virginia Commonwealth University and it represents 10 years (1999-2008) of clinical 
+# care at 130 US hospitals and integrated delivery networks. It includes over 50
+# features representing patient and hospital outcomes. 
+
+# Information regarding
+# 1. Hospital admission
+# 2. Diabetics encounter
+# 3. The length of stay was at least 1 day and at most 14 days
+# 4. Laboratory tests were performed
+# 5. Medications were administered 
+
+# Objectives: Classify a patient-hospital outcome and to 
+# cluster them aiming at finding patterns that give a distinct insight.
+
+# Current situation: The data contains such attributes as patient number, race, 
+# gender, age, admission type, time in hospital, medical specialty of admitting 
+# physician, number of lab test performed, HbA1c test result, diagnosis, number 
+# of medication, diabetic medications, number of outpatient, inpatient, and 
+# emergency visits in the year before the hospitalization, etc.
+
+# 2. Data understanding
+
+# Importar datos
+diabetic_data <- read.csv("~/dataset_diabetes/diabetic_data.csv", na.strings="?", stringsAsFactors=TRUE)
+
+diabetic_data$diag_1=as.numeric(diabetic_data$diag_1)
+diabetic_data$diag_2=as.numeric(diabetic_data$diag_2)
+diabetic_data$diag_3=as.numeric(diabetic_data$diag_3)
+
+#Creating train and test sets
+n = dim(diabetic_data)[1] #Number of observations
+p = dim(diabetic_data)[2] - 1 #Number of predictors
+
+indicesTrain = sample(1:n, round(n*0.7, digits = 0))
+indicesTest = c(1:n)[-indicesTrain]
+  
+xTest = data.frame(diabetic_data[indicesTest,1:p])
+xTrain = data.frame(diabetic_data[indicesTrain,1:p])
+
+yTrain = data.frame(diabetic_data[indicesTrain,p+1])
+yTest = data.frame(diabetic_data[indicesTest,p+1])
+
+# 2.1 Estadisticas Descriptivas
+
+# 2.2 Tipos de datos
+
+str(diabetic_data)
+
+### Con esta funcion veo el tipo de datos de las diferentes variables
+### Me di cuenta que diag_# me lo leia como factor y no como numero
+
+# 2.3 Data exploration
+
+#Histograma 
+freq_y_train = table(yTrain)
+barplot(freq_y_train, col = blues9, main = "Frecuence Y Train", xlab = "Variable de respuesta", ylab = "Frecuencia")
+
+### Si bien hay tres clases y estas no tienen el mismo numero de observaciones, no se denota la necesidad de hacer un tratamiento de clases imbalanceadas pues hay una buena representacion de cada clase en la muestra de datos
+
+#Correlacion
+library(corrplot)
+M = data.frame(xTrain$admission_type_id, xTrain$discharge_disposition_id, xTrain$admission_source_id,
+               xTrain$time_in_hospital, xTrain$num_lab_procedures, xTrain$num_procedures, xTrain$num_medications,
+               xTrain$number_outpatient, xTrain$number_emergency, xTrain$number_inpatient, xTrain$diag_1,
+               xTrain$diag_2, xTrain$diag_3, xTrain$number_diagnoses)
+M_cor = cor(M)
+corrplot(M_cor, method = 'number') # colorful number
+
+### Las dos variables que presentan la mayor correlacion positiva son dias en el hospital y numero de medicamentos suministrados
+
+# a. Graficas
+layout(matrix(c(1:9), nrow=3, byrow=FALSE))
+layout.show(9) 
+
+M = data.frame(xTrain,yTrain)
+M = na.omit(M)
+
+# a.1 Box plots
+for(i in 1:9){
+  boxplot(M$diabetic_data.indicesTrain..p...1.~M[,i], xlab = colnames(M)[i], ylab = "Readmission", col= blues9)
+}
+
+for(i in 10:18){
+  boxplot(M$diabetic_data.indicesTrain..p...1.~M[,i], xlab = colnames(M)[i], ylab = "Readmission", col= blues9)
+}
+
+for(i in 19:27){
+  boxplot(M$diabetic_data.indicesTrain..p...1.~M[,i], xlab = colnames(M)[i], ylab = "Readmission", col= blues9)
+}
+
+for(i in 28:36){
+  boxplot(M$diabetic_data.indicesTrain..p...1.~M[,i], xlab = colnames(M)[i], ylab = "Readmission", col= blues9)
+}
+
+for(i in 37:45){
+  boxplot(M$diabetic_data.indicesTrain..p...1.~M[,i], xlab = colnames(M)[i], ylab = "Readmission", col= blues9)
+}
+
+### Si bien hay muchas variables cuyas clases (cajas) se sobreponen, se denota que hay una clara variabilidad entre los datos, de modo que, hay indicias de que hay varias variables significativas
+### Si hay datos atipicos
+
+# Histogramas de variables numericas
+
+M = data.frame(xTrain,yTrain)
+
+for(i in 1:15){
+  if(is.numeric(M[1,i]) == TRUE){
+  hist(M[,i], xlab = colnames(M)[i], ylab = "Freq", col= blues9, main = "Histograma")
+  }
+}
+
+for(i in 16:50){
+  if(is.numeric(M[1,i]) == TRUE){
+    hist(M[,i], xlab = colnames(M)[i], ylab = "Freq", col= blues9, main = "Histograma")
+  }
+}
+
+# Barplot para las variables categoricas
+
+for(i in 1:25){
+  if(is.numeric(M[1,i]) == FALSE){
+    aux = table(M[,i])
+    barplot(aux, main = "Barplot", xlab = colnames(M)[i], ylab = "Freq", col= blues9)
+  }
+}
+
+for(i in 26:34){
+  if(is.numeric(M[1,i]) == FALSE){
+    aux = table(M[,i])
+    barplot(aux, main = "Barplot", xlab = colnames(M)[i], ylab = "Freq", col= blues9)
+  }
+}
+
+for(i in 35:43){
+  if(is.numeric(M[1,i]) == FALSE){
+    aux = table(M[,i])
+    barplot(aux, main = "Barplot", xlab = colnames(M)[i], ylab = "Freq", col= blues9)
+  }
+}
+
+for(i in 44:50){
+  if(is.numeric(M[1,i]) == FALSE){
+    aux = table(M[,i])
+    barplot(aux, main = "Barplot", xlab = colnames(M)[i], ylab = "Freq", col= blues9)
+  }
+}
+
+# Media (cuantitativo) - Mayor frecuencia (cualitativo)
+result = rep(0,50)
+
+for(i in 1:50){
+  if(is.numeric(M[1,i]) == TRUE){
+    result[i] = mean(M[,i])
+  }
+  else{
+  aux = sort(table(M[,i]))
+  result[i] = names(sort(table(M[,i]),decreasing = TRUE))[1]
+  }
+}
+
+result = data.frame(colnames(M),result)
+
+# 3. Data preparation
+
+# 3.1 Seleccion de variables
+
+### No hay razon por la que se deberia considerar construir el modelo con ciertas variables, con esto en mente,
+### se decidió quitar las siguientes: encounter_id y patient_nbr por logica
+### y examide y citoglipton pues solo manejan nivel, es decir la misma respuesta.        
+
+# 3.2 Seleccion de datos
+
+# 3.2.1 Datos faltantes
+library(VIM)
+aggr(xTrain, prop = FALSE, numbers = TRUE) 
+
+### no se va a considerar la variable weight pues tiene 69002 de 71236 faltantes
+### no se va a considerar la variable payer_code pues tiene 28068 de 71236 faltantes
+### no se va a considerar la variable medical_specialty pues tiene 34968 de 71236 faltantes
+
+xTrain = data.frame(xTrain[,3:5],xTrain[,7:10], xTrain[,13:39], xTrain[,42:49])
+
+sum(is.na(yTrain))
+
+### No hay faltantes en la variable de respuesta  
+
+# 3.2.2 Imputacion multiple
+
+library(mice)
+imputed = mice(xTrain)
+filled = complete(imputed)
+xTrain = na.omit(filled)
+
+sum(is.na(xTrain))
+
+### No hay faltantes en las variables explicativas
+
+# 3.2.3 Outlier Analysis
+
+library(DMwR2) #Algoritmo LOF (Local Outlier Factor)
+
+num = data.frame(xTrain$admission_type_id, xTrain$discharge_disposition_id, xTrain$admission_source_id,
+                 xTrain$time_in_hospital, xTrain$num_lab_procedures, xTrain$num_procedures, xTrain$num_medications,
+                 xTrain$number_outpatient, xTrain$number_emergency, xTrain$number_inpatient, xTrain$diag_1,
+                 xTrain$diag_2, xTrain$diag_3, xTrain$number_diagnoses)
+
+outlier.scores <- lofactor(num, k=5)
+plot(density(outlier.scores))
+outliers <- order(outlier.scores, decreasing=T)[1:500]
+print(outliers)
+
+train = data.frame(xTrain, yTrain)
+train = train[-outliers,]
+
+### Para identificar datos atipicos se usó un metodos basado en densidades y se escogio arbitrareamente quitar las 500 observaciones con el puntaje de outlier scores más altos
+
+# 4. Modeling and evaluation
+
+### Primero me toca hacer unas correcciones a los datos de prueba
+
+xTest = data.frame(xTest[,3:5],xTest[,7:10], xTest[,13:39], xTest[,42:49])
+
+library(mice)
+imputedTest = mice(xTest)
+filledTest = complete(imputedTest)
+xTest = na.omit(filledTest)
+
+test = data.frame(xTest, yTest)
+sum(is.na(test))
+
+names(train)[43] = "Y"
+names(test)[43] = "Y"
+
+# 4.1 k-Nearest Neighbour Classification
+library(kknn)
+modelo_knn = train.kknn(train[,43]~., train, kmax = 11)
+summary(modelo_knn)
+
+pred_modelo_knn = predict(modelo_knn, test)
+
+library(caret) #AC 0.9274
+con_knn = confusionMatrix(test$Y, pred_modelo_knn)
+
+# 4.2 Support Vector Machine
+library(e1071)
+rang=list(cost=c(0.01,0.05,0.1,1,2,5),gamma=c(0.1,0.5,1,2,4))
+
+tune_svm = tune(svm,train[,43]~.,data=train,ranges=rang) #Tunning en dos parametros de calibracion
+tune_svm
+
+modelo_svm = svm(train[,43]~.,data = train, cost=2, gamma=.5, probability=F , kernel="radial")
+
+pred_modelo_svm = predict(modelo_svm, test)
+
+library(caret) #AC 0.8529
+con_svm = confusionMatrix(test$Y, pred_modelo_svm)
+
+# 5. Deployment
+
+# Incializacion de variables
+
+result = rep(0,42)
+
+for(i in 1:42){
+  if(is.numeric(train[1,i]) == TRUE){
+    result[i] = as.numeric(round(mean(train[,i])))
+  }
+  else{
+    aux = sort(table(train[,i]))
+    result[i] = names(sort(table(train[,i]),decreasing = TRUE))[1]
+  }
+}
+
+result = data.frame(colnames(train[1:42]),result)
+
+library(shiny) 
+#https://deanattali.com/blog/building-shiny-apps-tutorial/
+#https://shiny.rstudio.com/articles/layout-guide.html
+
+#Interfaz
+ui <- fluidPage(
+  
+  #Color de fondo
+  tags$style('.container-fluid {background-color: #acdfdd;}'),
+  
+  # App title
+  titlePanel(h1(strong("Diabetes Patient-Hospital Outcome Classification"), alingn= "center")),
+  h4("General objective of the app: Classify a patient-hospital readmission outcome as: No readmission, A readmission in less than 30 days or A readmission in more than 30 days.", align="left"),
+  h5("Note: All variables have already been answered with its average if variable is numerical and with its most common answer if categorical.", align="left"),
+  
+  br(),
+  
+  sidebarLayout(
+    
+    #Input
+    sidebarPanel(
+        
+      h5(strong("Insert your information to make a prediction:")),
+      
+      br(),
+      
+      #race                    
+      radioButtons("race", "Input race:", sort(unique(train[,1])), selected = result[1,2]),
+      
+      #gender
+      radioButtons("gender", "Input gender:", c("Female", "Male"), selected = result[2,2]),
+      
+      #age
+      radioButtons("age", "Input age class:", sort(unique(train[,3])), selected = result[3,2]),
+      
+      h5(strong("Input the admission type:")),
+      h6("1:Emergency"),
+      h6("2:Urgent"), 
+      h6("3:Elective"),
+      h6("4:Newborn"),
+      h6("5:Not available"),
+      h6("6:NULL"),
+      h6("7:Tarauma center"),
+      h6("8:Not mapped"),
+      
+      #admission_type_id 
+      sliderInput("admission_type_id", "",
+                  min = min(train[,4]), max = max(train[,4]),
+                  value = as.numeric(result[4,2]), step = 1),
+      
+      h5(strong("Input discharge disposition:")),
+      h6("1:Discharged to home"),
+      h6("2:Discharged/transferred to another short term hospital"),
+      h6("3:Discharged/transferred to SNF"),
+      h6("4:Discharged/transferred to ICF"),
+      h6("5:Discharged/transferred to another type of inpatient care institution"),
+      h6("6:Discharged/transferred to home with home health service"),
+      h6("7:Left AMA"),
+      h6("8:Discharged/transferred to home under care of Home IV provider"),
+      h6("9:Admitted as an inpatient to this hospital"),
+      h6("10:Neonate discharged to another hospital for neonatal aftercare"),
+      h6("11:Expired"),
+      h6("12:Still patient or expected to return for outpatient services"),
+      h6("13:Hospice / home"),
+      h6("14:Hospice / medical facility"),
+      h6("15:Discharged/transferred within this institution to Medicare approved swing bed"),
+      h6("16:Discharged/transferred/referred another institution for outpatient services"),
+      h6("17:Discharged/transferred/referred to this institution for outpatient services"),
+      h6("18:NULL"),
+      h6("19:Expired at home. Medicaid only: hospice."),
+      h6("20:Expired in a medical facility. Medicaid only: hospice."),
+      h6("21:Expired: place unknown. Medicaid only: hospice."),
+      h6("22:Discharged/transferred to another rehab fac including rehab units of a hospital ."),
+      h6("23:Discharged/transferred to a long term care hospital."),
+      h6("24:Discharged/transferred to a nursing facility certified under Medicaid but not certified under Medicare."),
+      h6("25:Not Mapped"),
+      h6("26:Unknown/Invalid"),
+      h6("30:Discharged/transferred to another Type of Health Care Institution not Defined Elsewhere"),
+      h6("27:Discharged/transferred to a federal health care facility."),
+      h6("28:Discharged/transferred/referred to a psychiatric hospital of psychiatric distinct part unit of a hospital"),
+      h6("29:Discharged/transferred to a Critical Access Hospital (CAH)."),
+      
+      #discharge_disposition_id
+      sliderInput("discharge_disposition_id", "",
+                  min = min(train[,5]), max = max(train[,5]),
+                  value = as.numeric(result[5,2]), step = 1),
+      
+      h5(strong("Input admission source")),
+      h6("1: Physician Referral"),
+      h6("2:Clinic Referral"),
+      h6("3:HMO Referral"),
+      h6("4:Transfer from a hospital"),
+      h6("5: Transfer from a Skilled Nursing Facility (SNF)"),
+      h6("6: Transfer from another health care facility"),
+      h6("7: Emergency Room"),
+      h6("8: Court/Law Enforcement"),
+      h6("9: Not Available"),
+      h6("10: Transfer from critial access hospital"),
+      h6("11:Normal Delivery"),
+      h6("12: Premature Delivery"),
+      h6("13: Sick Baby"),
+      h6("14: Extramural Birth"),
+      h6("15:Not Available"),
+      h6("17:NULL"),
+      h6("18: Transfer From Another Home Health Agency"),
+      h6("19:Readmission to Same Home Health Agency"),
+      h6("20: Not Mapped"),
+      h6("21:Unknown/Invalid"),
+      h6("22: Transfer from hospital inpt/same fac reslt in a sep claim"),
+      h6("23: Born inside this hospital"),
+      h6("24: Born outside this hospital"),
+      h6("25: Transfer from Ambulatory Surgery Center"),
+      h6("26:Transfer from Hospice"),
+      
+      #admission_source_id    
+      sliderInput("admission_source_id", "",
+                  min = min(train[,6]), max = max(train[,6]),
+                  value = as.numeric(result[6,2]), step = 1),
+      
+      h5(strong("Input time in hospital")),
+      
+      #time_in_hospital        
+      sliderInput("time_in_hospital", "",
+                  min = min(train[,7]), max = max(train[,7]),
+                  value = as.numeric(result[7,2]), step = 1),
+      
+      h5(strong("Input number of lab procedures")),
+      
+      #num_lab_procedures      
+      sliderInput("num_lab_procedures", "",
+                  min = min(train[,8]), max = max(train[,8]),
+                  value = as.numeric(result[8,2]), step = 1),
+      
+      h5(strong("Input number of procedures")),
+      
+      #num_procedures          
+      sliderInput("num_procedures", "",
+                  min = min(train[,9]), max = max(train[,9]),
+                  value = as.numeric(result[9,2]), step = 1),
+      
+      h5(strong("Input number of medications")),
+      
+      #num_medications         
+      sliderInput("num_medications", "",
+                  min = min(train[,10]), max = max(train[,10]),
+                  value = as.numeric(result[10,2]), step = 1),
+      
+      h5(strong("Input number outpatient")),
+      
+      #number_outpatient       
+      sliderInput("number_outpatient", "",
+                  min = min(train[,11]), max = max(train[,11]),
+                  value = as.numeric(result[11,2])),
+      
+      h5(strong("Input number emergency")),
+      
+      #number_emergency        
+      sliderInput("number_emergency", "",
+                  min = min(train[,12]), max = max(train[,12]),
+                  value = as.numeric(result[12,2])),
+      
+      h5(strong("Input number inpatient")),
+      
+      #number_inpatient        
+      sliderInput("number_inpatient", "",
+                  min = min(train[,13]), max = max(train[,13]),
+                  value = as.numeric(result[13,2]), step = 1),
+      
+      h5(strong("Input results for diag 1")),
+      
+      #diag_1                  
+      sliderInput("diag_1", "",
+                  min = min(train[,14]), max = max(train[,14]),
+                  value = as.numeric(result[14,2]), step = 1),
+      
+      h5(strong("Input results for diag 2")),
+      
+      #diag_2
+      sliderInput("diag_2", "",
+                  min = min(train[,15]), max = max(train[,15]),
+                  value = as.numeric(result[15,2]), step = 1),
+      
+      h5(strong("Input results for diag 3")),
+      
+      #diag_3                 
+      sliderInput("diag_3", "",
+                  min = min(train[,16]), max = max(train[,16]),
+                  value = as.numeric(result[16,2]), step = 1),
+      
+      #number_diagnoses        
+      sliderInput("number_diagnoses", "",
+                  min = min(train[,17]), max = max(train[,17]),
+                  value = as.numeric(result[17,2]), step = 1),
+      
+      #max_glu_serum           
+      radioButtons("max_glu_serum", "Input max_glu_serum:", unique(train[,18]), selected = result[18,2]),
+      
+      #A1Cresult               
+      radioButtons("A1Cresult", "Input A1Cresult:", unique(train[,19]), selected = result[19,2]),
+      
+      #metformin               
+      radioButtons("metformin", "Input metformin", unique(train[,20]), selected = result[20,2]),
+      
+      #repaglinide             
+      radioButtons("repaglinide", "Input repaglinide", unique(train[,21]), selected = result[21,2]),
+      
+      #nateglinide  
+      radioButtons("nateglinide", "Input nateglinide", unique(train[,22]), selected = result[22,2]),
+      
+      #chlorpropamide 
+      radioButtons("chlorpropamide", "Input chlorpropamide", unique(train[,23]), selected = result[23,2]),
+      
+      #glimepiride
+      radioButtons("glimepiride", "Input glimepiride", unique(train[,24]), selected = result[24,2]),
+      
+      #acetohexamide           
+      radioButtons("acetohexamide", "Input acetohexamide", c("No", "Steady"), selected = result[25,2]),
+      
+      #glipizide               
+      radioButtons("glipizide", "Input glipizide", unique(train[,26]), selected = result[26,2]),
+      
+      #glyburide  
+      radioButtons("glyburide", "Input glyburide", unique(train[,27]), selected = result[27,2]),
+      
+      #tolbutamide             
+      radioButtons("tolbutamide", "Input tolbutamide", unique(train[,28]), selected = result[28,2]),
+      
+      #pioglitazone  
+      radioButtons("pioglitazone", "Input pioglitazone", unique(train[,29]), selected = result[29,2]),
+      
+      #rosiglitazone           
+      radioButtons("rosiglitazone", "Input rosiglitazone", unique(train[,30]), selected = result[30,2]),
+      
+      #acarbose                
+      radioButtons("acarbose", "Input acarbose", unique(train[,31]), selected = result[31,2]),
+      
+      #miglitol                
+      radioButtons("miglitol", "Input miglitol", unique(train[,32]), selected = result[32,2]),
+      
+      #troglitazone            
+      radioButtons("troglitazone", "Input troglitazone", unique(train[,33]), selected = result[33,2]),
+      
+      #tolazamide              
+      radioButtons("tolazamide", "Input tolazamide", unique(train[,34]), selected = result[34,2]),
+      
+      #insulin      
+      radioButtons("insulin", "Input insulin", unique(train[,35]), selected = result[35,2]),
+      
+      #glyburide.metformin 
+      radioButtons("glyburide.metformin", "Input glyburide.metformin", unique(train[,36]), selected = result[36,2]),
+ 
+      #glipizide.metformin 
+      radioButtons("glipizide.metformin", "Input glipizide.metformin", unique(train[,37]), selected = result[37,2]),
+      
+      #glimepiride.pioglitazone
+      radioButtons("glimepiride.pioglitazone", "Input glimepiride.pioglitazone", unique(train[,38]), selected = result[38,2]),
+      
+      #metformin.rosiglitazone
+      radioButtons("metformin.rosiglitazone", "Input metformin.rosiglitazone", unique(train[,39]), selected = result[39,2]),
+      
+      #metformin.pioglitazone  
+      radioButtons("metformin.pioglitazone", "Input metformin.pioglitazone", unique(train[,40]), selected = result[40,2]),
+      
+      #change  
+      radioButtons("change", "Input change", unique(train[,41]), selected = result[41,2]),
+      
+      #diabetesMed 
+      radioButtons("diabetesMed", "Input diabetesMed", unique(train[,42]), selected = result[42,2]),
+      
+    ),
+    
+    # Output
+    mainPanel(
+      
+      tabsetPanel(
+      
+        tabPanel("SVM",
+          
+            h4("El método de clasificación-regresión Máquinas de Vector Soporte (Vector Support Machines, SVMs) fue desarrollado en la década de los 90, dentro de campo de la ciencia computacional. Si bien originariamente se desarrolló como un método de clasificación binaria, su aplicación se ha extendido a problemas de clasificación múltiple y regresión. SVMs ha resultado ser uno de los mejores clasificadores para un amplio abanico de situaciones, por lo que se considera uno de los referentes dentro del ámbito de aprendizaje estadístico y machine learning."),
+            h5("https://rpubs.com/Joaquin_AR/267926"),
+            
+            br(),
+            
+            h4("El AC obtenido para este modelo es de 85,29%"),
+            
+            br(),
+                      
+            plotOutput("PlotSVM"),
+        
+            br(),
+            
+            plotOutput("confSVM")
+        
+        ),
+        
+        tabPanel("KNN",
+                 
+            h4("El método K-NN es un métodos más importantes de clasificación supervisada. En el proceso de aprendizaje no se hace ninguna suposición acerca de la distribución de las variables predictoras, es por ello que es un método de clasificación no paramétrico.Es un método bastante sencillo y robusto que simplemente busca en las observaciones más cercanas a la que se está tratando de predecir y clasifica el punto de interés basado en la mayoría de datos que le rodean."),
+            h5("https://rpubs.com/JairoAyala/601703"),
+            
+            br(),
+            
+            h4("El AC obtenido para este modelo es de 92,74%"),
+       
+            plotOutput("PlotKNN"),
+            
+            br(),
+            
+            plotOutput("confKNN")
+        
+        ),
+        
+        tabPanel("Predictions",
+            
+            h4("Usando la información suministrada en la encuesta del panel izquierdo, la clasificación de ser readmitido es:"),
+            
+            br(),
+            
+            tableOutput("Prediction"),
+            
+            br(),
+            
+            tableOutput("values"),
+            tags$head(tags$style("#values table {background-color: white; }", media="screen", type="text/css")),
+    
+        )
+      )  
+    )
+  )
+)
+
+# Servidor
+server <- function(input, output) {
+  
+  output$PlotSVM <- renderPlot({
+    barplot(table(pred_modelo_svm), main = "Prediction Distribution using SVM", ylab="Frequency", xlab = "Readmitted", col = blues9)
+  })
+  
+  output$confSVM <- renderPlot({
+    heatmap(con_svm$table, col = blues9, xlab="Actual", ylab="Predicted", main = "Confussion Matrix SVM")
+  })
+  
+  output$PlotKNN <- renderPlot({
+    barplot(table(pred_modelo_knn), main = "Prediction Distribution using KNN", ylab="Frequency", xlab = "Readmitted", col = blues9)
+  })
+  
+  output$confKNN <- renderPlot({
+    heatmap(con_knn$table, col = blues9, xlab="Actual", ylab="Predicted", main = "Confussion Matrix KNN")
+  })
+  
+  output$values <- renderTable({
+    
+    Answer = c(input$race,	input$gender,	input$age,	input$admission_type_id,	input$discharge_disposition_id,	input$admission_source_id,	input$time_in_hospital,	input$num_lab_procedures,	input$num_procedures,	input$num_medications,	input$number_outpatient,	input$number_emergency,	input$number_inpatient,	input$diag_1,	input$diag_2,	input$diag_3,	input$number_diagnoses,	input$max_glu_serum,	input$A1Cresult,	input$metformin,	input$repaglinide,	input$nateglinide,	input$chlorpropamide,	input$glimepiride,	input$acetohexamide,	input$glipizide,	input$glyburide,	input$tolbutamide,	input$pioglitazone,	input$rosiglitazone,	input$acarbose,	input$miglitol,	input$troglitazone,	input$tolazamide,	input$insulin,	input$glyburide.metformin,	input$glipizide.metformin,	input$glimepiride.pioglitazone,	input$metformin.rosiglitazone,	input$metformin.pioglitazone,	input$change,	input$diabetesMed)
+    Variable = result[,1]
+    data.frame(Variable, Answer)
+    
+    
+  })
+  
+  output$Prediction <- renderTable({
+    
+   Answer = data.frame(input$race,	input$gender,	input$age,	input$admission_type_id,	
+                    input$discharge_disposition_id,	input$admission_source_id,	
+                    input$time_in_hospital,	input$num_lab_procedures,	input$num_procedures,	
+                    input$num_medications,	input$number_outpatient,	input$number_emergency,	
+                    input$number_inpatient,	input$diag_1,	input$diag_2,	input$diag_3,	
+                    input$number_diagnoses,	input$max_glu_serum,	input$A1Cresult,	
+                    input$metformin,	input$repaglinide,	input$nateglinide,	
+                    input$chlorpropamide,	input$glimepiride,	input$acetohexamide,	
+                    input$glipizide,	input$glyburide,	input$tolbutamide,	input$pioglitazone,	
+                    input$rosiglitazone,	input$acarbose,	input$miglitol,	input$troglitazone,	
+                    input$tolazamide,	input$insulin,	input$glyburide.metformin,	
+                    input$glipizide.metformin,	input$glimepiride.pioglitazone,	
+                    input$metformin.rosiglitazone,	input$metformin.pioglitazone,	
+                    input$change,	input$diabetesMed, "NO")
+    
+    colnames(Answer)=colnames(train)
+    
+    predi_modelo_svm = predict(modelo_svm, Answer)
+    predi_modelo_knn = predict(modelo_knn, Answer)
+     
+    data.frame(c("SVM"),c(predi_modelo_svm[1]))
+      
+  })
+  
+}
+
+# Create Shiny app ----
+shinyApp(ui, server)
+
